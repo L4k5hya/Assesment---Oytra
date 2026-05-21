@@ -1,0 +1,200 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c672efb0-9648-41ec-8208-754cce5eb017",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        160,
+        0
+      ],
+      "id": "c2efd853-6972-4f10-aa47-357c26289994",
+      "name": "Get Top Cryptos",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst coins = items.map(item => item.json);\n\nconst top5 = coins.slice(0, 5).map(coin => ({\n  name: coin.name,\n  symbol: coin.symbol.toUpperCase(),\n  price: coin.current_price,\n  change24h: coin.price_change_percentage_24h,\n  marketCap: coin.market_cap,\n  id: coin.id\n}));\n\nreturn top5.map(coin => ({ json: coin }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "id": "42ab1c21-52fc-442d-8f1b-ae076865a3ba",
+      "name": "Filter Top 5"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.coingecko.com/api/v3/coins/{{ $('Filter Top 5').first().json.id }}/market_chart?vs_currency=usd&days=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        608,
+        0
+      ],
+      "id": "0ecd21e6-df16-48a5-8335-568f759cdb4d",
+      "name": "Get Bitcoin 24h Chart",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "284f4ef2-2da4-4169-b606-cd249b2e67a8",
+              "leftValue": "={{ $('Filter Top 5').first().json.change24h }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        0
+      ],
+      "id": "c79887bf-8789-4b12-b319-b72e4376e534",
+      "name": "Big Move?"
+    },
+    {
+      "parameters": {
+        "chatId": "1081487330",
+        "text": "=🚀 *Crypto Morning Digest*\n\nTop 5 Coins Right Now:\n{{ $('Filter Top 5').all().map(i => `• ${i.json.name} (${i.json.symbol}): $${i.json.price} | 24h: ${i.json.change24h.toFixed(2)}%`).join('\\n') }}\n\n⚠️ *Alert: Bitcoin moved more than 5% in 24h!*\nChange: {{ $('Filter Top 5').first().json.change24h.toFixed(2) }}%",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1024,
+        -80
+      ],
+      "id": "9e398f9a-632e-4499-8a22-f90c0b0662b9",
+      "name": "Send Digest",
+      "webhookId": "561ba6b0-da8e-4fb3-9e5a-a56336627b45",
+      "credentials": {
+        "telegramApi": {
+          "id": "WHZxvAnCcDxJ6Hu8",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        96
+      ],
+      "id": "b57efdaa-fc7f-4f59-bac3-44b5c3443003",
+      "name": "No Alert Needed"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Top Cryptos": {
+      "main": [
+        [
+          {
+            "node": "Filter Top 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Top 5": {
+      "main": [
+        [
+          {
+            "node": "Get Bitcoin 24h Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bitcoin 24h Chart": {
+      "main": [
+        [
+          {
+            "node": "Big Move?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Big Move?": {
+      "main": [
+        [
+          {
+            "node": "Send Digest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Alert Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9c731441-30de-45cd-a9fa-52db5e428a2a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7563369f4ed6aba51a93d0524824b9e231ff950c9b04ebd6ad6b12c21788a108"
+  },
+  "id": "3AL8KqqkJVsEo1o2",
+  "tags": []
+}
